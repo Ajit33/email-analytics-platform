@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Newsletter Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    section { margin: 1.5rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+    label { display: block; margin-top: 0.5rem; }
+    input, button { margin-top: 0.25rem; padding: 0.5rem; }
+    button { cursor: pointer; background: #333; color: #fff; border: none; border-radius: 4px; }
+    button:hover { background: #555; }
+    pre { background: #f5f5f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem; }
+    .error { color: #c00; }
+    .success { color: #080; }
+  </style>
+</head>
+<body>
+  <h1>Newsletter Assignment — Dashboard</h1>
+  <p>Use this page to send campaigns and view stats (no Postman).</p>
+
+  <section>
+    <h2>1. Login</h2>
+    <label>Email <input type="email" id="loginEmail" value="youradmin@gmail.com" /></label>
+    <label>Password <input type="password" id="loginPass" value="12345678" /></label>
+    <button type="button" id="btnLogin">Login</button>
+    <pre id="loginResult"></pre>
+  </section>
+
+  <section>
+    <h2>2. Send campaign</h2>
+    <label>Campaign ID <input type="text" id="campaignId" value="f46f398a-b026-467f-83ad-ce95158fd484" placeholder="UUID" /></label>
+    <label>Segment (optional) <input type="text" id="segment" value="alpha" /></label>
+    <button type="button" id="btnSend">Send campaign</button>
+    <pre id="sendResult"></pre>
+  </section>
+
+  <section>
+    <h2>3. Click statistics</h2>
+    <label>Organization ID <input type="text" id="orgId" value="9ab5d5a7-b09a-4fed-b31b-c1bddc97d62e" placeholder="UUID" /></label>
+    <button type="button" id="btnStats">Refresh stats</button>
+    <pre id="statsResult"></pre>
+  </section>
+
+  <section>
+    <h2>4. Real-time (WebSocket)</h2>
+    <button type="button" id="btnWs">Connect WebSocket</button>
+    <button type="button" id="btnWsOff">Disconnect</button>
+    <pre id="wsResult"></pre>
+  </section>
+
+  <script>
+    const API = window.location.origin + '/api';
+    let token = '';
+    let wsSocket = null;
+
+    document.getElementById('btnLogin').onclick = async () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      const out = document.getElementById('loginResult');
+      try {
+        const r = await fetch(API + '/users/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pass })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message || 'Login failed');
+        token = data.accessToken;
+        out.textContent = 'Logged in. Token saved for Send & WebSocket.';
+        out.className = 'success';
+      } catch (e) {
+        out.textContent = e.message || 'Error';
+        out.className = 'error';
+      }
+    };
+
+    document.getElementById('btnSend').onclick = async () => {
+      const cid = document.getElementById('campaignId').value.trim();
+      const segment = document.getElementById('segment').value.trim();
+      const out = document.getElementById('sendResult');
+      try {
+        const r = await fetch(API + '/campaigns/' + cid + '/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(segment ? { segment } : {})
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message || 'Send failed');
+        out.textContent = JSON.stringify(data, null, 2);
+        out.className = 'success';
+      } catch (e) {
+        out.textContent = e.message || 'Error';
+        out.className = 'error';
+      }
+    };
+
+    document.getElementById('btnStats').onclick = async () => {
+      const cid = document.getElementById('campaignId').value.trim();
+      const orgId = document.getElementById('orgId').value.trim();
+      const out = document.getElementById('statsResult');
+      try {
+        const url = API + '/click-stats/campaign/' + cid + '?organizationId=' + encodeURIComponent(orgId);
+        const r = await fetch(url);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message || 'Failed');
+        out.textContent = JSON.stringify(data, null, 2);
+        out.className = '';
+      } catch (e) {
+        out.textContent = e.message || 'Error';
+        out.className = 'error';
+      }
+    };
+
+    function logWs(msg) {
+      const pre = document.getElementById('wsResult');
+      pre.textContent = (pre.textContent || '') + msg + '\n';
+    }
+
+    document.getElementById('btnWs').onclick = () => {
+      if (!token) { logWs('Login first to get a token.'); return; }
+      if (wsSocket) { logWs('Already connected.'); return; }
+      const url = window.location.origin.replace(/^http/, 'ws');
+      logWs('Connecting to ' + url + '/stats ...');
+      const io = window.io;
+      if (!io) { logWs('Socket.IO not loaded.'); return; }
+      wsSocket = io(url + '/stats', { auth: { token }, transports: ['websocket', 'polling'] });
+      wsSocket.on('connect', () => logWs('[Connected] Listening for click.processed, email.processed'));
+      wsSocket.on('connect_error', (e) => logWs('[Error] ' + e.message));
+      wsSocket.on('click.processed', (d) => logWs('[Real-time] click.processed ' + JSON.stringify(d)));
+      wsSocket.on('email.processed', (d) => logWs('[Real-time] email.processed ' + JSON.stringify(d)));
+    };
+
+    document.getElementById('btnWsOff').onclick = () => {
+      if (wsSocket) { wsSocket.close(); wsSocket = null; logWs('[Disconnected]'); }
+    };
+  </script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</body>
+</html>
