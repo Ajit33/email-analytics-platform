@@ -1,14 +1,7 @@
-# Newsletter Backend Assignment
 
-This repository now implements the mandatory assignment features:
-
-- Secure click/open tracking with signed tokens
-- Asynchronous processing using BullMQ + Redis
-- Worker-based click logging and email sending
-- Dead Letter Queue (DLQ) for failed jobs
-- Real-time tenant-scoped dashboard updates over WebSockets
 
 ## Architecture
+<img width="1505" height="707" alt="image" src="https://github.com/user-attachments/assets/371d1deb-00e7-4edb-93ec-64404c4c0100" />
 
 ### Click Flow (non-blocking)
 
