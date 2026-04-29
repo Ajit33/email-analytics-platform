@@ -95,7 +95,7 @@ Events:
 - `click.processed`
 - `email.processed`
 
-## Demo Checklist (for submission video)
+## Start Process
 
 1. Start backend + Postgres + Redis
 2. Register/login user (tenant-scoped)
